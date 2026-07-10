@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cursor × Salesforce</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.22.5/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:     #0C0C0C;
+    --bg2:    #111111;
+    --bg3:    #171717;
+    --border: rgba(255,255,255,0.08);
+    --border-hi: rgba(255,255,255,0.13);
+    --text:   #FFFFFF;
+    --muted:  rgba(255,255,255,0.52);
+    --dim:    rgba(255,255,255,0.28);
+    --orange: #E85500;
+    --orange-bg: rgba(232,85,0,0.10);
+    --orange-border: rgba(232,85,0,0.28);
+  }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: var(--dim); }
+  .section-anchor { scroll-margin-top: 68px; }
+  .card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 14px; }
+  .card-orange { background: var(--orange-bg); border: 1px solid var(--orange-border); border-radius: 14px; }
+  .card-bright { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.11); border-radius: 14px; }
+  .rule { height: 1px; background: var(--border); }
+  .step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 3px rgba(232,85,0,0.18); flex-shrink: 0; }
+  .step-line { width: 1px; background: linear-gradient(180deg, rgba(232,85,0,0.35), rgba(255,255,255,0.05)); flex: 1; min-height: 24px; margin-left: 3.5px; }
+  .q-block { border-left: 2px solid rgba(232,85,0,0.38); padding-left: 14px; }
+  .nav-link { font-size: 13px; color: var(--dim); padding: 5px 11px; border-radius: 999px; transition: all 0.15s; }
+  .nav-link:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.75); }
+  .hero-glow { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 800px 500px at 80% -10%, rgba(232,85,0,0.09), transparent 60%), radial-gradient(ellipse 600px 400px at 5% 85%, rgba(255,255,255,0.02), transparent 65%); }
+  .persona-btn { padding: 7px 16px; border-radius: 999px; font-size: 13px; font-weight: 500; transition: all 0.15s; cursor: pointer; }
+  .persona-btn-active { background: var(--orange); color: #000; border: 1px solid var(--orange); }
+  .persona-btn-idle { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
+  .persona-btn-idle:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.75); }
+  .model-box { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10); border-radius: 12px; padding: 20px 24px; flex: 1; }
+  .model-arrow { color: var(--orange); font-size: 20px; flex-shrink: 0; display: flex; align-items: center; padding: 0 8px; }
+  .flow-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .flow-arrow { color: var(--orange); font-size: 18px; flex-shrink: 0; display: flex; align-items: flex-start; padding-top: 22px; width: 28px; justify-content: center; }
+  .flow-connector { display: flex; justify-content: flex-end; padding-right: calc(33.33% + 6px); margin: 4px 0; color: var(--orange); font-size: 16px; line-height: 1; }
+  @media (max-width: 768px) { .flow-row { flex-direction: column !important; } .flow-arrow { padding-top: 0 !important; transform: rotate(90deg); } .flow-connector { padding-right: 0 !important; justify-content: center; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+
+// ── Data ─────────────────────────────────────────────────────────────────────
+
+const NAV = [
+  { id: 'opportunity',  label: 'The opportunity' },
+  { id: 'analogy',      label: 'The model' },
+  { id: 'workflow',     label: 'What it looks like' },
+  { id: 'day-in-life',  label: 'Day in the life' },
+  { id: 'conversation', label: 'The ask' },
+];
+
+const OBSERVATIONS = [
+  {
+    n: '01',
+    title: 'The rest of your company already runs this way.',
+    body: 'Engineering, sales, and GTM systems are already running Salesforce headlessly — through Cursor and Slack, without opening dashboards. Headless 360 named Cursor specifically as part of this shift. Marketing is the one function that hasn\'t been connected to that model yet.',
+  },
+  {
+    n: '02',
+    title: 'We\'ve seen your paid campaigns on Snapchat.',
+    body: 'That\'s a meaningfully more advanced paid motion than most seven-month-old marketing functions are running. It also means you\'re already juggling channels that each report performance differently — which is exactly where a unified, pipeline-connected view starts to matter more than any single platform\'s dashboard.',
+  },
+  {
+    n: '03',
+    title: 'This isn\'t a team learning enterprise GTM for the first time.',
+    body: 'Sarah Stevens and Katy Abbaszadeh both built revenue marketing at Glean and Rubrik. Kevin Hartnett came from Linear and Stripe. Nicole Zhang built marketing at Hex and Bubble. The knowledge of what a functioning enterprise demand engine looks like is already in the room — the constraint is building it at the speed the business is moving.',
+  },
+  {
+    n: '04',
+    title: 'The next two quarters are a real window, not just a distraction.',
+    body: 'A pending acquisition of this size usually means a stretch where budgets get reviewed and attention shifts toward the deal rather than new systems. The teams that use that window to get the infrastructure right — rather than rebuilding under pressure post-close — tend to come out of it in a stronger position.',
+  },
+];
+
+const WORKFLOW = [
+  {
+    n: '01',
+    label: 'Surface the insight',
+    detail: 'Marketing Intelligence flags a trend — email outpacing SMS, an enterprise segment underperforming, paid spend diverging from pipeline contribution. The insight surfaces and gets shared to Slack in one click. No export, no screenshot, no context lost in translation.',
+  },
+  {
+    n: '02',
+    label: 'Build the brief',
+    detail: 'Slackbot pulls from existing channel conversations, campaign history, and performance data. In minutes: a structured brief with audience size, key messages, and creative direction — built from context your team already has, not a blank template.',
+  },
+  {
+    n: '03',
+    label: 'Execute the journey',
+    detail: 'From a natural language prompt, the agent creates the multi-step campaign — email and SMS variations, send time optimization, audience segmentation — without anyone navigating a campaign builder UI. What used to require multiple people and two weeks of coordination runs in minutes.',
+  },
+  {
+    n: '04',
+    label: 'Close the loop',
+    detail: 'Attribution connects program activity back to pipeline and revenue without leaving the work surface. The morning review that used to mean three separate dashboard logins becomes a Slack query or a Cursor prompt.',
+  },
+];
+
+const PERSONAS = [
+  {
+    id: 'revenue',
+    title: 'Revenue Marketing',
+    context: 'Building the enterprise demand engine from zero — account targeting, lead programs, pipeline attribution — while the PLG motion is still the primary growth driver.',
+    steps: [
+      {
+        n: '01', title: 'Define the target',
+        desc: 'Set ICP parameters, choose active segments, align with sales on which accounts are in play.',
+        callout: 'When many of your best targets already have developers using Cursor, the warm list looks different from a cold firmographic filter. Is that signal being used?',
+      },
+      {
+        n: '02', title: 'Build the list',
+        desc: 'Account selection by firmographic profile, intent signals, and product presence data.',
+        callout: 'What if account selection was a prompt rather than a manual filter — pulling from product usage, intent data, and firmographics in one step?',
+      },
+      {
+        n: '03', title: 'Brief the SDR team',
+        desc: 'Campaign context handed off to reps — what accounts they\'re going after, what the play is.',
+        callout: 'If the brief arrived in the Slack channel where reps are already working deals — rather than a field they look up in the CRM — what changes about the handoff?',
+      },
+      {
+        n: '04', title: 'Execute the campaign',
+        desc: 'Emails, content, paid amplification targeted to the account list. Segment → build → launch.',
+        callout: 'A campaign that used to take two weeks of back-and-forth can run in minutes from a prompt. For a lean team, that changes what\'s possible this week vs. next quarter.',
+      },
+      {
+        n: '05', title: 'Route and qualify',
+        desc: 'Leads come in, SDR picks up, attribution is tagged at entry point.',
+        callout: 'MQL definition — what counts, who owns follow-up, how fast — is a structural decision that sets the trajectory for everything downstream. How aligned is that definition with sales right now?',
+      },
+      {
+        n: '06', title: 'Report pipeline influence',
+        desc: 'What did marketing touch this week? What moved? What\'s attributable to the program?',
+        callout: 'What does the story look like when attribution connects automatically to the pipeline records RevOps already tracks — rather than a separate marketing dashboard that leadership doesn\'t look at?',
+      },
+    ],
+  },
+  {
+    id: 'paid',
+    title: 'Paid Media',
+    context: 'Scaling paid across multiple channels for a product with two distinct audiences — developers and enterprise buyers — and a brand moment actively in progress.',
+    steps: [
+      {
+        n: '01', title: 'Review overnight performance',
+        desc: 'Cross-channel pacing, CTR, CPL — from every live platform before the day builds.',
+        callout: 'Each channel reports by its own metrics. What if the first read came from a unified view surfaced in Slack — before you\'d opened a single browser tab?',
+      },
+      {
+        n: '02', title: 'Refine audiences',
+        desc: 'Targeting adjustments, exclusion lists, lookalike builds — spend concentrating where it should.',
+        callout: 'Targeting individual developers and enterprise buyers at the same company requires different audience logic. What\'s the model for keeping those two motions from blurring into each other?',
+      },
+      {
+        n: '03', title: 'Launch new creative',
+        desc: 'Asset approval, tracking verification, going live with new campaigns.',
+        callout: 'Tracking breaks are silent — a UTM issue doesn\'t surface until end of month. How is tracking integrity being QA\'d before launch, not discovered after?',
+      },
+      {
+        n: '04', title: 'Optimize spend',
+        desc: 'Shift budget based on performance signals. Which channels to press, which to pull back.',
+        callout: 'Optimizing toward CPL and optimizing toward pipeline influence look very different. Which metric is driving budget decisions right now — and does leadership see the same number?',
+      },
+      {
+        n: '05', title: 'Attribute to pipeline',
+        desc: 'Connect channel spend to pipeline movement and closed revenue.',
+        callout: 'What\'s the story you want to tell about paid\'s revenue contribution — and how far is your current setup from being able to tell it in a way that holds up in a CFO conversation?',
+      },
+      {
+        n: '06', title: 'Report performance',
+        desc: 'Cross-channel efficiency, pipeline contribution, and recommendations for the week ahead.',
+        callout: 'A paid program that only reports CPL is fighting a budget battle it will eventually lose. When does the attribution model connect spend to revenue — and is it being built now?',
+      },
+    ],
+  },
+  {
+    id: 'brand',
+    title: 'Brand & Founding',
+    context: 'Holding the brand identity through an enterprise transition, a global expansion, and a $60B acquisition — simultaneously, with a new team.',
+    steps: [
+      {
+        n: '01', title: 'Monitor the brand',
+        desc: 'Developer community pulse, social sentiment, product review sites — the brand is what engineers say about Cursor.',
+        callout: 'For a developer-first product, community sentiment is a leading indicator. What if that signal was aggregated and surfaced proactively rather than checked manually across channels each morning?',
+      },
+      {
+        n: '02', title: 'Align the message',
+        desc: 'Developer narrative and enterprise buyer narrative kept coherent — different, but not contradicting.',
+        callout: 'The two messages can\'t be the same — but they can\'t contradict each other either. What\'s the mechanism that keeps product, marketing, and sales speaking from the same foundation across both audiences?',
+      },
+      {
+        n: '03', title: 'Shape the acquisition story',
+        desc: '"Who is Cursor now?" needs an answer before the deal closes. Who owns it?',
+        callout: 'This narrative will fall to marketing whether it planned to or not. The teams that get ahead of it control the story. How far along is the internal alignment on what the answer actually is?',
+      },
+      {
+        n: '04', title: 'Activate the Compile audience',
+        desc: 'Content repurposing, community follow-up, post-event warm nurture.',
+        callout: 'Compile generated real attention. What\'s the nurture sequence — and is it running through the surfaces where developers actually live, or a system they don\'t use day-to-day?',
+      },
+      {
+        n: '05', title: 'Sync across functions',
+        desc: 'Product, sales, and demand gen all working from the same brand foundation.',
+        callout: 'Brand either becomes the connective tissue across every function or becomes irrelevant to everyone. What does it look like when a feature ships and every team communicates consistently — from the same work surface?',
+      },
+      {
+        n: '06', title: 'Measure brand health',
+        desc: 'Leading indicators: developer NPS, community growth, sentiment trend.',
+        callout: 'Brand health is usually measured after the fact. What are the forward-looking signals your team is watching — and how quickly does a signal turn into an action?',
+      },
+    ],
+  },
+  {
+    id: 'content',
+    title: 'Content & Demand',
+    context: 'Building a content and demand program for two distinct audiences simultaneously, with limited bandwidth and a new attribution model.',
+    steps: [
+      {
+        n: '01', title: 'Audit content performance',
+        desc: 'What\'s resonating, what\'s not, and where the coverage gaps are across both audiences.',
+        callout: 'Content performance metrics tell you what\'s resonating. They don\'t tell you what\'s influencing pipeline. What if you could ask that question in plain language and get a grounded answer?',
+      },
+      {
+        n: '02', title: 'Prioritize the build',
+        desc: 'Developer content vs. enterprise buyer vs. sales enablement — deciding what gets built first.',
+        callout: 'Serving three distinct consumers at once tends to default to whoever asks loudest. What\'s the framework for deciding what gets built first — and who owns that call?',
+      },
+      {
+        n: '03', title: 'Produce and distribute',
+        desc: 'Two distribution playbooks running in parallel: developer community and enterprise accounts.',
+        callout: 'Getting the right content to a developer community and to an enterprise target list require fundamentally different approaches. How is the separation — and the intentional overlap — being managed?',
+      },
+      {
+        n: '04', title: 'Brief the sales team',
+        desc: 'Right content for the right account at the right point in a deal.',
+        callout: 'If reps could surface the right content within the Slack workflow where they\'re already working — not from a separate library — how does utilization change? And how does quality feedback get back to you?',
+      },
+      {
+        n: '05', title: 'Track content influence',
+        desc: 'Content engagement mapped to pipeline stages and deal progression.',
+        callout: '"We published 40 pieces this quarter" is a weak story with a CRO. "Content influenced X% of pipeline" earns marketing a seat at the revenue table. What does your current setup support?',
+      },
+      {
+        n: '06', title: 'Optimize the program',
+        desc: 'What gets built next, based on what actually moved deals.',
+        callout: 'The optimization loop requires connecting content engagement to pipeline data. How close is your current setup to supporting that decision — and what\'s the gap?',
+      },
+    ],
+  },
+  {
+    id: 'startup',
+    title: 'Startup Marketing',
+    context: 'Managing the developer community and startup ecosystem that built Cursor\'s growth — and connecting it intentionally to enterprise pipeline.',
+    steps: [
+      {
+        n: '01', title: 'Check community health',
+        desc: 'Ambassador workspace activity, forum engagement, startup program participation.',
+        callout: 'A community that runs on its own is a PLG asset. A community that\'s managed well is a pipeline asset. What signals tell you when to start managing it more actively?',
+      },
+      {
+        n: '02', title: 'Identify scaling signals',
+        desc: 'Which startups are growing fast and approaching enterprise-scale technology decisions?',
+        callout: 'The startups scaling fastest in Cursor\'s ecosystem are your best future enterprise accounts — or a competitor\'s. What\'s the model for identifying that signal before they\'re already in an evaluation?',
+      },
+      {
+        n: '03', title: 'Engage the ecosystem',
+        desc: 'VC relationships, accelerator programs, developer network — the network Cursor is embedded in.',
+        callout: 'Cursor\'s base is deeply embedded in the YC and startup ecosystem. What does converting that relationship into a trackable pipeline source look like — and is that connection being made today?',
+      },
+      {
+        n: '04', title: 'Support the PLG motion',
+        desc: 'Keep the self-serve developer motion strong as enterprise programs scale.',
+        callout: 'Enterprise investment can crowd out PLG — not from intention, but from bandwidth. What does it look like to manage both as distinct programs with different metrics and different owners?',
+      },
+      {
+        n: '05', title: 'Convert to pipeline',
+        desc: 'Community → commercial → enterprise upgrade path — the highest-leverage motion in startup marketing.',
+        callout: 'How many accounts are actively moving along the PLG-to-enterprise upgrade path right now — and how is that being tracked?',
+      },
+      {
+        n: '06', title: 'Report to leadership',
+        desc: 'Community growth and startup pipeline contribution made legible to a CRO.',
+        callout: 'Making community a credible revenue investment requires a reporting model that connects activity to revenue. That story is worth building while the data is still clean and easy to instrument.',
+      },
+    ],
+  },
+  {
+    id: 'field',
+    title: 'Field & Strategic',
+    context: 'Building field marketing and ABM programs from scratch for a company expanding globally and targeting enterprise accounts for the first time.',
+    steps: [
+      {
+        n: '01', title: 'Review regional pipeline',
+        desc: 'Field activity connected to pipeline across US, EMEA, and APJ — how are the programs performing?',
+        callout: 'Field attribution models that work for US programs often don\'t extend cleanly to EMEA and APJ. With both markets building fast, is the infrastructure decision being made now — or later?',
+      },
+      {
+        n: '02', title: 'Run ABM programs',
+        desc: 'Named account personalization for the accounts that matter most to the enterprise motion.',
+        callout: 'ABM for a product with existing developer presence inside target accounts is a different motion than cold ABM. How is product signal being used to warm the enterprise buyer conversation?',
+      },
+      {
+        n: '03', title: 'Align with the sales team',
+        desc: 'Field programs connected to what AEs and SDRs are actually working this week.',
+        callout: 'The field-to-digital gap — where programs run without the other side seeing them — costs more pipeline than almost any other structural issue. What does the shared work surface look like right now?',
+      },
+      {
+        n: '04', title: 'Coordinate globally',
+        desc: 'EMEA and APJ programs on the same foundation, not rebuilt per market.',
+        callout: 'Teams that get global marketing right make one infrastructure decision early — programs built to extend, not duplicate. With London scaling and APJ building, when does that decision happen?',
+      },
+      {
+        n: '05', title: 'Measure field ROI',
+        desc: 'Attribution that connects field investment to pipeline and closed revenue.',
+        callout: 'Field marketing is often the first budget cut when growth slows, because it\'s the hardest to attribute. Is the attribution model being built now, while the program is small enough to instrument cleanly?',
+      },
+      {
+        n: '06', title: 'Plan the next cycle',
+        desc: 'What\'s working, what to scale, what to cut — the planning loop for field programs.',
+        callout: 'The planning loop for field programs needs the same data layer demand gen uses — connected to pipeline, visible to leadership. How close is that infrastructure to being in place?',
+      },
+    ],
+  },
+];
+
+// ── Components ────────────────────────────────────────────────────────────────
+
+function CursorMark({ size = 22 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      <path d="M16 2 L29 9.5 L29 22.5 L16 30 L3 22.5 L3 9.5 Z" stroke="white" strokeWidth="1.5" fill="none" strokeLinejoin="round"/>
+      <path d="M16 2 L29 9.5 L16 17 L3 9.5 Z" fill="white" fillOpacity="0.09" stroke="white" strokeWidth="0.8" strokeLinejoin="round"/>
+      <path d="M3 9.5 L16 17 L16 30" stroke="white" strokeWidth="0.8" strokeOpacity="0.35"/>
+      <path d="M29 9.5 L16 17 L16 30" stroke="white" strokeWidth="0.8" strokeOpacity="0.18"/>
+    </svg>
+  );
+}
+
+function Header() {
+  return (
+    <header className="sticky top-0 z-50" style={{background: 'rgba(12,12,12,0.94)', backdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(255,255,255,0.07)'}}>
+      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2.5">
+            <CursorMark size={20} />
+            <span className="font-semibold tracking-tight" style={{fontSize: '15px'}}>CURSOR</span>
+          </div>
+          <span style={{color: 'rgba(255,255,255,0.15)', fontSize: '16px'}}>×</span>
+          <span className="font-medium" style={{fontSize: '13px', color: 'rgba(255,255,255,0.26)'}}>Salesforce</span>
+        </div>
+        <nav className="hidden lg:flex items-center gap-0.5">
+          {NAV.map(n => <a key={n.id} href={`#${n.id}`} className="nav-link">{n.label}</a>)}
+        </nav>
+        <div className="mono text-xs" style={{color: 'rgba(255,255,255,0.18)'}}>Jul 2026</div>
+      </div>
+    </header>
+  );
+}
+
+function Hero() {
+  return (
+    <section style={{background: 'var(--bg)', position: 'relative', overflow: 'hidden'}}>
+      <div className="hero-glow"></div>
+      <div className="relative max-w-7xl mx-auto px-6 pt-24 pb-20">
+        <div style={{display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '999px', padding: '4px 14px', marginBottom: '28px'}}>
+          <span className="mono" style={{fontSize: '11px', color: 'var(--dim)'}}>Prepared for Cursor's marketing team</span>
+        </div>
+        <h1 className="font-bold text-white leading-tight tracking-tight" style={{fontSize: 'clamp(38px, 5.5vw, 64px)', maxWidth: '860px', marginBottom: '24px'}}>
+          Engineers don't open software to run it.
+          <br />
+          <span style={{color: 'var(--orange)'}}>Marketing shouldn't either.</span>
+        </h1>
+        <p style={{fontSize: '18px', lineHeight: '1.65', color: 'var(--muted)', maxWidth: '620px', marginBottom: '36px'}}>
+          Marketing Cloud, Slack, and Claude as a single work surface — accessible from wherever your team already works. The campaign that used to take two weeks of back-and-forth takes three minutes from a prompt. We think there's a conversation worth having.
+        </p>
+        <div style={{display: 'flex', gap: '12px', flexWrap: 'wrap'}}>
+          <a href="#opportunity" style={{background: 'var(--orange)', color: '#000', padding: '10px 22px', borderRadius: '999px', fontSize: '14px', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px'}}>
+            See our thinking →
+          </a>
+          <a href="#conversation" style={{background: 'rgba(255,255,255,0.05)', color: 'var(--muted)', border: '1px solid var(--border)', padding: '10px 22px', borderRadius: '999px', fontSize: '14px', fontWeight: 500, textDecoration: 'none'}}>
+            Skip to the ask
+          </a>
+        </div>
+      </div>
+      <div className="max-w-7xl mx-auto px-6 pb-16">
+        <div className="rule" style={{marginBottom: '28px'}}></div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          {[
+            { label: 'Campaign build time',   value: '3 min', sub: 'Prompt to live journey, vs. two weeks of coordination' },
+            { label: 'Estimated ARR',          value: '$4B+',  sub: 'Fastest-scaling B2B software on record' },
+            { label: 'New marketing hires',    value: '7',     sub: 'In the last six months' },
+            { label: 'New UIs to learn',       value: '0',     sub: 'The workplane is already in your stack' },
+          ].map((s, i) => (
+            <div key={i}>
+              <p className="eyebrow" style={{marginBottom: '8px'}}>{s.label}</p>
+              <p className="mono font-semibold text-white" style={{fontSize: '30px'}}>{s.value}</p>
+              <p style={{fontSize: '12px', color: 'var(--dim)', marginTop: '4px'}}>{s.sub}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Opportunity() {
+  return (
+    <section id="opportunity" className="section-anchor" style={{background: 'var(--bg2)', padding: '96px 0'}}>
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid lg:grid-cols-12 gap-12">
+          <div className="lg:col-span-4">
+            <p className="eyebrow mono" style={{marginBottom: '12px'}}>Section 01</p>
+            <h2 className="font-bold text-white leading-tight tracking-tight" style={{fontSize: 'clamp(28px, 3.5vw, 42px)', marginBottom: '20px'}}>
+              A choice most marketing teams never get to make.
+            </h2>
+            <div className="rule" style={{marginBottom: '20px'}}></div>
+            <p style={{color: 'var(--muted)', lineHeight: '1.7', marginBottom: '16px'}}>
+              Most marketing tools ask your team to context-switch into a browser-based UI. That's fine for a traditional marketing team. It's a tax on a team that's built the rest of their business to work headlessly.
+            </p>
+            <p style={{color: 'var(--muted)', lineHeight: '1.7'}}>
+              You're building marketing from scratch, right now. The window to make it agent-native by design — rather than retrofitting it later — is open while the program is still small enough to build it right the first time. Here's what we've actually observed.
+            </p>
+          </div>
+          <div className="lg:col-span-8 grid md:grid-cols-2 gap-4">
+            {OBSERVATIONS.map(o => (
+              <div key={o.n} className="card" style={{padding: '24px'}}>
+                <p className="mono" style={{fontSize: '11px', color: 'var(--orange)', marginBottom: '14px'}}>{o.n}</p>
+                <h3 className="font-semibold text-white" style={{fontSize: '14px', lineHeight: '1.5', marginBottom: '10px'}}>{o.title}</h3>
+                <p style={{fontSize: '13px', color: 'var(--muted)', lineHeight: '1.65'}}>{o.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Analogy() {
+  return (
+    <section id="analogy" className="section-anchor" style={{background: 'var(--bg)', padding: '96px 0'}}>
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="max-w-3xl mb-14">
+          <p className="eyebrow mono" style={{marginBottom: '12px'}}>Section 02</p>
+          <h2 className="font-bold text-white leading-tight tracking-tight" style={{fontSize: 'clamp(28px, 3.5vw, 42px)', marginBottom: '16px'}}>
+            What Cursor is to your engineers,<br />
+            <span style={{color: 'var(--orange)'}}>this is to your marketers.</span>
+          </h2>
+          <p style={{color: 'var(--muted)', lineHeight: '1.7'}}>
+            Cursor's product is built on one insight: give the AI the right context and the right tools, and the interface gets out of the way. The same architecture applies to marketing operations. Your team is the architect. The work happens in the surfaces they already use. Marketing Cloud is the execution layer — it just doesn't require anyone to open it.
+          </p>
+        </div>
+
+        <div style={{display: 'flex', alignItems: 'stretch', gap: '0', marginBottom: '48px', flexWrap: 'wrap', gap: '8px'}}>
+          {[
+            {
+              label: 'Your team',
+              role: 'The Architect',
+              desc: 'Strategy, vision, and the prompt. The decision lives here — in Slack, in Cursor, in Claude.',
+            },
+            null,
+            {
+              label: 'Slack · Claude · Cursor',
+              role: 'The Blueprint',
+              desc: 'The plan takes shape in the work surface your team already uses. Logic, copy, audience — no new interface.',
+            },
+            null,
+            {
+              label: 'Marketing Cloud',
+              role: 'The Power Tools',
+              desc: 'Takes the plan and makes it real — journeys, data, sends, attribution — without anyone logging in.',
+            },
+          ].map((item, i) => item === null ? (
+            <div key={i} className="model-arrow hidden md:flex">→</div>
+          ) : (
+            <div key={i} className="model-box">
+              <p className="mono" style={{fontSize: '11px', color: 'var(--orange)', marginBottom: '6px'}}>{item.role}</p>
+              <p className="font-semibold text-white" style={{fontSize: '14px', marginBottom: '8px'}}>{item.label}</p>
+              <p style={{fontSize: '13px', color: 'var(--muted)', lineHeight: '1.6'}}>{item.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="card-orange" style={{padding: '28px 32px', maxWidth: '680px'}}>
+          <p className="font-semibold text-white" style={{fontSize: '18px', lineHeight: '1.5', marginBottom: '12px'}}>
+            "It removes the friction between the decision and the execution."
+          </p>
+          <p style={{fontSize: '14px', color: 'var(--muted)', lineHeight: '1.65'}}>
+            Cursor's entire product philosophy is this model applied to code. Marketing Cloud brings it to marketing — so a campaign brief written in Slack becomes a live, segmented, attributed journey without anyone navigating a campaign builder.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Workflow() {
+  return (
+    <section id="workflow" className="section-anchor" style={{background: 'var(--bg3)', padding: '96px 0'}}>
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid lg:grid-cols-12 gap-14 items-start">
+          <div className="lg:col-span-4">
+            <p className="eyebrow mono" style={{marginBottom: '12px'}}>Section 03</p>
+            <h2 className="font-bold text-white leading-tight tracking-tight" style={{fontSize: 'clamp(28px, 3.5vw, 42px)', marginBottom: '20px'}}>
+              From a prompt to a live campaign in three minutes.
+            </h2>
+            <div className="rule" style={{marginBottom: '20px'}}></div>
+            <p style={{color: 'var(--muted)', lineHeight: '1.7', marginBottom: '16px'}}>
+              What we're describing isn't a roadmap item. This is a workflow that's running today — at companies building the same enterprise motion yours is.
+            </p>
+            <p style={{color: 'var(--muted)', lineHeight: '1.7'}}>
+              The chain below — insight to brief to execution to attribution — previously required multiple people and roughly two weeks of coordination. The demo ran in three to four minutes.
+            </p>
+          </div>
+          <div className="lg:col-span-8">
+            <div className="card" style={{padding: '36px'}}>
+              {WORKFLOW.map((step, i) => (
+                <div key={i} style={{display: 'flex', gap: '18px'}}>
+                  <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '4px', width: '16px', flexShrink: 0}}>
+                    <div className="step-dot"></div>
+                    {i < WORKFLOW.length - 1 && <div className="step-line"></div>}
+                  </div>
+                  <div style={{paddingBottom: i < WORKFLOW.length - 1 ? '28px' : '0', flex: 1}}>
+                    <div style={{display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '6px'}}>
+                      <span className="mono" style={{fontSize: '11px', color: 'var(--orange)'}}>{step.n}</span>
+                      <span className="font-semibold text-white" style={{fontSize: '15px'}}>{step.label}</span>
+                    </div>
+                    <p style={{fontSize: '13px', color: 'var(--muted)', lineHeight: '1.7'}}>{step.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{marginTop: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap'}}>
+              {[
+                'No Journey Builder navigation',
+                'No Contact Builder clicks',
+                'No dashboard logins',
+                'Attribution included',
+              ].map((tag, i) => (
+                <div key={i} style={{display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(232,85,0,0.08)', border: '1px solid rgba(232,85,0,0.20)', borderRadius: '999px', padding: '5px 12px', fontSize: '12px', color: 'rgba(232,85,0,0.85)', fontWeight: 500}}>
+                  {tag}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FlowStep({ step }) {
+  return (
+    <div className="flow-card">
+      <p className="mono" style={{fontSize: '11px', color: 'var(--orange)'}}>{step.n}</p>
+      <p className="font-semibold text-white" style={{fontSize: '13px', lineHeight: '1.4'}}>{step.title}</p>
+      <p style={{fontSize: '12px', color: 'var(--muted)', lineHeight: '1.6', flex: 1}}>{step.desc}</p>
+      {step.callout && (
+        <div className="q-block" style={{marginTop: '4px'}}>
+          <p style={{fontSize: '11px', color: 'rgba(255,255,255,0.35)', lineHeight: '1.6', fontStyle: 'italic'}}>{step.callout}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PersonaFlow({ steps }) {
+  const row1 = steps.slice(0, 3);
+  const row2 = steps.slice(3);
+  return (
+    <div>
+      <div className="flow-row" style={{display: 'flex', alignItems: 'stretch', gap: '6px', marginBottom: '4px'}}>
+        {row1.map((step, i) => (
+          <React.Fragment key={step.n}>
+            <FlowStep step={step} />
+            {i < row1.length - 1 && (
+              <div className="flow-arrow">→</div>
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+      {row2.length > 0 && (
+        <>
+          <div className="flow-connector">↓</div>
+          <div className="flow-row" style={{display: 'flex', alignItems: 'stretch', gap: '6px'}}>
+            {row2.map((step, i) => (
+              <React.Fragment key={step.n}>
+                <FlowStep step={step} />
+                {i < row2.length - 1 && (
+                  <div className="flow-arrow">→</div>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DayInTheLife() {
+  const [active, setActive] = useState(0);
+  const persona = PERSONAS[active];
+
+  return (
+    <section id="day-in-life" className="section-anchor" style={{background: 'var(--bg2)', padding: '96px 0'}}>
+      <div className="max-w-7xl mx-auto px-6">
+        <div style={{maxWidth: '620px', marginBottom: '40px'}}>
+          <p className="eyebrow mono" style={{marginBottom: '12px'}}>Section 04</p>
+          <h2 className="font-bold text-white leading-tight tracking-tight" style={{fontSize: 'clamp(28px, 3.5vw, 42px)', marginBottom: '16px'}}>
+            The workflow, step by step.
+          </h2>
+          <p style={{color: 'var(--muted)', lineHeight: '1.7'}}>
+            Educated guesses on how each role moves through its core workflow — based on what we see at companies doing this same build. The questions are the point, not the assumptions.
+          </p>
+        </div>
+
+        <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '36px'}}>
+          {PERSONAS.map((p, i) => (
+            <button key={p.id} onClick={() => setActive(i)}
+              className={`persona-btn ${active === i ? 'persona-btn-active' : 'persona-btn-idle'}`}>
+              {p.title}
+            </button>
+          ))}
+        </div>
+
+        <div className="card" style={{padding: '28px 32px'}}>
+          <div style={{marginBottom: '28px'}}>
+            <p className="mono eyebrow" style={{color: 'var(--orange)', marginBottom: '6px'}}>{persona.title}</p>
+            <p style={{fontSize: '14px', color: 'var(--muted)', lineHeight: '1.65', maxWidth: '640px'}}>{persona.context}</p>
+          </div>
+          <PersonaFlow steps={persona.steps} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WorkshopCTA() {
+  return (
+    <section id="conversation" className="section-anchor" style={{background: 'var(--bg)', padding: '96px 0'}}>
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid lg:grid-cols-12 gap-12 items-start">
+          <div className="lg:col-span-6">
+            <p className="eyebrow mono" style={{marginBottom: '12px'}}>Section 05</p>
+            <h2 className="font-bold text-white leading-tight tracking-tight" style={{fontSize: 'clamp(28px, 3.5vw, 42px)', marginBottom: '20px'}}>
+              A working session,<br />
+              <span style={{color: 'var(--orange)'}}>not a demo.</span>
+            </h2>
+            <p style={{color: 'var(--muted)', lineHeight: '1.7', marginBottom: '16px'}}>
+              We're not asking for a software evaluation. We're asking for a conversation about where your team is, what you're building, and where the highest-leverage questions are right now.
+            </p>
+            <p style={{color: 'var(--muted)', lineHeight: '1.7', marginBottom: '16px'}}>
+              We'll run the two-week-to-three-minute workflow live, in your environment, with your data — not a canned demo. Then we work the rest of the session on whatever's actually on your team's plate.
+            </p>
+            <p style={{color: 'var(--muted)', lineHeight: '1.7'}}>
+              We work with marketing teams at exactly this stage regularly — a half-day or 90-minute format, your agenda, your call on who's in the room. Subject matter experts in attribution, ABM, demand gen, events, and RevOps. Practical output you can act on whether or not it involves Salesforce.
+            </p>
+          </div>
+          <div className="lg:col-span-6" style={{display: 'flex', flexDirection: 'column', gap: '14px'}}>
+            <div className="card-orange" style={{padding: '24px'}}>
+              <p className="font-semibold text-white" style={{fontSize: '14px', marginBottom: '14px'}}>What it looks like</p>
+              {[
+                'The live workflow, run in your environment, with your data',
+                'Half-day or 90-minute format — your agenda',
+                'Subject matter experts across attribution, ABM, events, demand gen',
+                'Practical output your team can act on — not a sales proposal',
+                'No obligation on either side',
+              ].map((item, i) => (
+                <div key={i} style={{display: 'flex', gap: '10px', fontSize: '13px', color: 'var(--muted)', lineHeight: '1.5', marginBottom: i < 4 ? '10px' : 0}}>
+                  <span style={{color: 'var(--orange)', flexShrink: 0}}>→</span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+            <div className="card" style={{padding: '24px'}}>
+              <p className="font-semibold text-white" style={{fontSize: '14px', marginBottom: '8px'}}>The single ask</p>
+              <p style={{fontSize: '13px', color: 'var(--muted)', lineHeight: '1.65'}}>
+                Is there a problem your team is working through right now where a conversation with people who've seen it before would be useful? That's the starting point. Everything else follows from there.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Partnership() {
+  return (
+    <section style={{background: 'var(--bg3)', borderTop: '1px solid rgba(255,255,255,0.06)', padding: '72px 0'}}>
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid lg:grid-cols-12 gap-12 items-start">
+          <div className="lg:col-span-5">
+            <h3 className="font-bold text-white" style={{fontSize: '22px', marginBottom: '16px'}}>We're already in the building.</h3>
+            <p style={{color: 'var(--muted)', lineHeight: '1.7', fontSize: '14px'}}>
+              Cursor has been a Salesforce partner for several years. The relationship runs deep across engineering, sales, and operations — infrastructure the business already runs on. This microsite is about extending that partnership to marketing: not a new vendor evaluation, but a conversation that's already happening on the technical side, brought to the team that builds your GTM motion.
+            </p>
+          </div>
+          <div className="lg:col-span-7">
+            <p className="eyebrow mono" style={{marginBottom: '16px'}}>Who's behind this</p>
+            <div className="grid md:grid-cols-3 gap-4">
+              {[
+                { name: 'Jason Choi',    role: 'Core Account Executive',    email: 'jason.choi@salesforce.com' },
+                { name: 'Sam Flemmer',   role: 'Marketing Cloud Specialist', email: 'sflemmer@salesforce.com' },
+                { name: 'Amanda Witter', role: 'AVP, Marketing Cloud',       email: 'amanda.witter@salesforce.com' },
+              ].map(p => (
+                <div key={p.name} className="card" style={{padding: '18px'}}>
+                  <p className="font-semibold text-white" style={{fontSize: '13px', marginBottom: '4px'}}>{p.name}</p>
+                  <p style={{fontSize: '11px', color: 'var(--dim)', marginBottom: '8px'}}>{p.role}</p>
+                  <a href={`mailto:${p.email}`} style={{fontSize: '11px', color: 'var(--orange)', textDecoration: 'none'}}>{p.email}</a>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer style={{background: 'var(--bg)', borderTop: '1px solid rgba(255,255,255,0.05)', padding: '28px 0'}}>
+      <div className="max-w-7xl mx-auto px-6" style={{display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px'}}>
+        <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+          <CursorMark size={16} />
+          <span className="font-medium" style={{fontSize: '13px', color: 'rgba(255,255,255,0.25)'}}>CURSOR</span>
+          <span style={{color: 'rgba(255,255,255,0.12)', fontSize: '14px'}}>×</span>
+          <span style={{fontSize: '13px', color: 'rgba(255,255,255,0.20)'}}>Salesforce</span>
+        </div>
+        <div className="mono" style={{fontSize: '11px', color: 'rgba(255,255,255,0.16)'}}>
+          Prepared July 2026 · Internal working draft · Not for distribution
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <Header />
+      <Hero />
+      <Opportunity />
+      <Analogy />
+      <Workflow />
+      <DayInTheLife />
+      <WorkshopCTA />
+      <Partnership />
+      <Footer />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
